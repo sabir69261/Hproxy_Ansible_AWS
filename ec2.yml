@@ -1,0 +1,65 @@
+---
+
+- hosts: localhost
+  vars_files:
+       - keys.yml
+  vars:
+     inventorypath: "/etc/ip.txt"       
+  tasks:
+          - name: Launch ec2 Instance for LoadBalancer
+            ec2:
+               image: ami-005c06c6de69aee84
+               instance_type: t2.micro
+               count: 1
+               group: ansible
+               wait: yes
+               vpc_subnet_id: subnet-8626e9dc
+               key_name: ss
+               assign_public_ip: yes
+               region: us-west-1
+               aws_access_key: "{{ accesskey }}"
+               aws_secret_key: "{{ secretkey }}"
+            register: awslb
+
+          - name: Launch ec2 Instance for Backend server
+            ec2:
+               image: ami-005c06c6de69aee84
+               instance_type: t2.micro
+               count: 2
+               group: ansible
+               wait: yes
+               vpc_subnet_id: subnet-8626e9dc
+               key_name: ss
+               assign_public_ip: yes
+               region: us-west-1
+               aws_access_key: "{{ accesskey }}"
+               aws_secret_key: "{{ secretkey }}"
+            register: awsbs
+
+   
+          - name: fetch the instance ip and update inventory for Loadbalancer
+            lineinfile:
+              path: "{{ inventorypath }}"
+              insertafter: '^\[loadbalancer]'
+              firstmatch: yes
+              line: "{{ awslb.instances[0].public_ip }}  ansible_user=ec2-user ansible_ssh_private_key_file=/root/main/aws/ss.pem  ansible_ssh_connection=ssh"
+              state: present
+
+          - name: fetch the instance ip and update inventory for backend server
+            lineinfile:
+              path: "{{ inventorypath }}"
+              insertafter: '^\[Backend_servers]'
+              firstmatch: yes
+              line: "{{ item }}"
+              state: present
+            loop:
+                -  "{{ awsbs.instances[0].public_ip }}  ansible_user=ec2-user ansible_ssh_private_key_file=/root/main/aws/ss.pem  ansible_ssh_connection=ssh"
+                -  "{{ awsbs.instances[1].public_ip }}  ansible_user=ec2-user ansible_ssh_private_key_file=/root/main/aws/ss.pem  ansible_ssh_connection=ssh"
+              
+
+                    
+
+   
+       
+
+
